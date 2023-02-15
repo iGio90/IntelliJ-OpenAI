@@ -25,3 +25,8 @@ simply add a comment in your editor with that format:
 ```
 
 and so on for all other languages. **NOTE** that the first word ``code`` and the last ``.`` are used as input/output
+
+### Bonus
+
+- auto-detect the language of the current file
+- auto indent

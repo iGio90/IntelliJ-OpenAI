@@ -16,6 +16,10 @@ public class OpenAIPrefs extends AnAction {
         PropertiesComponent.getInstance().setValue("openai_api_key", dialog.getApiKey());
     }
 
+    public static int sumTwoNumbers(int num1, int num2) {
+      return num1 + num2;
+    }
+
     public static class ApiKeyDialog extends JDialog {
         private final JTextField mApiKeyField;
 
