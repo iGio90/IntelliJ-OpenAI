@@ -32,7 +32,7 @@ simply add a comment in your editor with that format:
 // code a function that sum 2 numbers.
 ```
 
-and so on for all other languages. **NOTE** that the first word ``code`` and the last ``.`` are used as input/output
+and so on for all other languages. **NOTE** that the first word ``code`` and the last ``.`` are used as begin/end of input
 
 ### Bonus
 
