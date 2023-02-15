@@ -1,0 +1,21 @@
+Manifest-Version: 1.0
+Main-Class: 
+Class-Path: kotlin-stdlib-1.6.20.jar json-20220924.jar kotlin-stdlib-com
+ mon-1.6.20.jar okhttp-4.10.0.jar annotations-13.0.jar kotlin-stdlib-jdk
+ 7-1.5.31.jar json-20220924.jar 3rd-party-rt.jar ant.jar app.jar asm-7.1
+ .jar asm-analysis-7.1.jar asm-commons-7.1.jar asm-tree-7.1.jar asm-util
+ -7.1.jar byte-buddy-agent.jar dbus-java-3.2.1.jar dom-impl.jar dom-open
+ api.jar duplicates-analysis.jar error-prone-annotations.jar external-sy
+ stem-rt.jar externalProcess-rt.jar forms_rt.jar groovy.jar grpc-netty-s
+ haded.jar idea_rt.jar intellij-coverage-agent-1.0.656.jar intellij-test
+ -discovery.jar java-utils-1.0.6.jar jffi-1.2.19.jar jffi-1.2.19-native.
+ jar jna.jar jnr-a64asm-1.0.0.jar jnr-constants-0.9.12.jar jnr-enxio-0.2
+ 1.jar jnr-ffi-2.1.10.jar jnr-posix-3.0.50.jar jnr-unixsocket-0.23.jar j
+ nr-x86asm-1.0.2.jar jps-model.jar jsch-agent.jar jsp-base-openapi.jar j
+ unit4.jar junixsocket-core.jar lz4-java.jar platform-objectSerializer-a
+ nnotations.jar platform-statistics-devkit.jar protobuf.jar pty4j.jar rd
+ -core.jar rd-framework.jar rd-swing.jar rd-text.jar stats.jar structura
+ lsearch.jar testFramework.jar tests_bootstrap.jar uast-tests.jar util.j
+ ar util_rt.jar winp.jar okio-jvm-3.0.0.jar kotlin-stdlib-jdk8-1.5.31.ja
+ r annotations-23.0.0.jar
+
