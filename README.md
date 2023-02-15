@@ -12,6 +12,14 @@ I was very upset that all the plugins which uses openai models just open a webvi
 2) install as a regular plugin from disk ([read here](https://www.jetbrains.com/help/idea/managing-plugins.html))
 3) click the tools menu -> OpenAI Preferences and insert your api key
 
+### Or build it yourself
+
+```
+./gradlew shadowJar
+
+get the jar from build/libs/xxx.jar
+```
+
 ### How to
 
 simply add a comment in your editor with that format:
