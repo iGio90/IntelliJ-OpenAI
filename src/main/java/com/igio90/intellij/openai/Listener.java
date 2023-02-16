@@ -63,7 +63,7 @@ public class Listener implements DocumentListener {
             }
             skipDotCheck = true;
 
-            if (commentKeyword.equals("generate")) {
+            if (commentKeyword.equals("generate") || commentKeyword.equals("create")) {
                 promptType = switch (words[2]) {
                     case "code" -> PROMPT_TYPE_CODE;
                     case "doc" -> PROMPT_TYPE_DOC;
