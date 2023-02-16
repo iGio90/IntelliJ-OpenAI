@@ -1,6 +1,8 @@
 ## Intellij and OpenAI
 
-straight in the code editor.
+straight in the code editor. 
+
+works with any intelliJ powered IDE, including Android Studio.
 
 ### Setup
 
