@@ -5,8 +5,8 @@ import com.intellij.openapi.editor.Document;
 import org.json.JSONObject;
 
 class CodeProcessor extends BaseProcessor {
-    CodeProcessor(Document document, int lineNum, int currentIndent, String query, String language) {
-        super(document, lineNum, currentIndent, query, language);
+    CodeProcessor(Document document, int lineNum, int currentIndent, String query, String language, Processors.OnProcessFinished onProcessFinished) {
+        super(document, lineNum, currentIndent, query, language, onProcessFinished);
     }
 
     @Override

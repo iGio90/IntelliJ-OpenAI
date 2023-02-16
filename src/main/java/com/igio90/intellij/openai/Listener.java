@@ -5,9 +5,13 @@ import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.TextRange;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Listener implements DocumentListener {
     public static final int PROMPT_TYPE_NONE = -1;
@@ -108,25 +112,67 @@ public class Listener implements DocumentListener {
             return;
         }
 
-        switch (promptType) {
-            case PROMPT_TYPE_CODE -> {
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// generating code...");
-                Processors.getInstance().processCode(
-                        document, lineNum, query
-                );
+        process(document, lineNum, promptType, query);
+    }
+
+    private void process(Document document, int lineNum, int promptType, String query) {
+        AtomicBoolean isGenerating = new AtomicBoolean(true);
+
+        String label = switch (promptType) {
+            case PROMPT_TYPE_CODE -> "Generating code";
+            case PROMPT_TYPE_DOC -> "Generating documentation";
+            case PROMPT_TYPE_STYLE -> "Applying stylus improvements";
+            default -> throw new RuntimeException("unknown prompt type: " + promptType);
+        };
+
+        document.setReadOnly(true);
+
+        new Task.Backgroundable(DocumentUtils.getProject(), label) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                Processors.OnProcessFinished onProcessFinished = () -> {
+                    isGenerating.set(false);
+                    indicator.setIndeterminate(false);
+                    document.setReadOnly(false);
+                };
+
+                indicator.setText(label + ".");
+                indicator.setFraction(0);
+                indicator.setIndeterminate(true);
+
+                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + label + "...", false);
+
+                switch (promptType) {
+                    case PROMPT_TYPE_CODE -> Processors.getInstance().processCode(
+                            document, lineNum, query, onProcessFinished
+                    );
+                    case PROMPT_TYPE_DOC -> Processors.getInstance().processDoc(
+                            document, lineNum, onProcessFinished
+                    );
+                    case PROMPT_TYPE_STYLE -> Processors.getInstance().processLint(
+                            document, lineNum, onProcessFinished
+                    );
+                }
             }
-            case PROMPT_TYPE_DOC -> {
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// generating doc...");
-                Processors.getInstance().processDoc(
-                        document, lineNum
-                );
+        }.queue();
+
+        Thread thread = new Thread(() -> {
+            int dotCount = 1;
+
+            while (isGenerating.get()) {
+                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + label + ".".repeat(dotCount), false);
+
+                try {
+                    //noinspection BusyWait
+                    Thread.sleep(500);
+                } catch (InterruptedException ignored) {}
+
+                dotCount += 1;
+                if (dotCount > 3) {
+                    dotCount = 1;
+                }
             }
-            case PROMPT_TYPE_STYLE -> {
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// applying lint and stylus fixes...");
-                Processors.getInstance().processLint(
-                        document, lineNum
-                );
-            }
-        }
+        });
+        thread.start();
     }
 }

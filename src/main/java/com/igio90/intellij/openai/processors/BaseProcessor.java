@@ -15,21 +15,23 @@ abstract class BaseProcessor extends Thread {
     private final int mCurrentIndent;
     private final String mQuery;
     private final String mLanguage;
+    private final Processors.OnProcessFinished mOnProcessFinished;
 
-    BaseProcessor(Document document) {
-        this(document, 0);
+    BaseProcessor(Document document, Processors.OnProcessFinished onProcessFinished) {
+        this(document, 0, onProcessFinished);
     }
 
-    BaseProcessor(Document document, int lineNum) {
-        this(document, lineNum, 0, null, null);
+    BaseProcessor(Document document, int lineNum, Processors.OnProcessFinished onProcessFinished) {
+        this(document, lineNum, 0, null, null, onProcessFinished);
     }
 
-    BaseProcessor(Document document, int lineNum, int currentIndent, String query, String language) {
+    BaseProcessor(Document document, int lineNum, int currentIndent, String query, String language, Processors.OnProcessFinished onProcessFinished) {
         mDocument = document;
         mLineNum = lineNum;
         mCurrentIndent = currentIndent;
         mQuery = query;
         mLanguage = language;
+        mOnProcessFinished = onProcessFinished;
     }
 
     String getQuery() {
@@ -94,6 +96,10 @@ abstract class BaseProcessor extends Thread {
                     getLineNum(),
                     "// failed to generate code... error: " + e.getMessage()
             );
+        }
+
+        if (mOnProcessFinished != null) {
+            mOnProcessFinished.onProcessFinished();
         }
     }
 }

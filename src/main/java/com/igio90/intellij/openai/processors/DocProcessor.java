@@ -5,8 +5,8 @@ import com.intellij.openapi.editor.Document;
 import org.json.JSONObject;
 
 class DocProcessor extends BaseProcessor {
-    DocProcessor(Document document, int lineNum) {
-        super(document, lineNum);
+    DocProcessor(Document document, int lineNum, Processors.OnProcessFinished onProcessFinished) {
+        super(document, lineNum, onProcessFinished);
     }
 
     @Override

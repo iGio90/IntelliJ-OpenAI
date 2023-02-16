@@ -5,8 +5,8 @@ import com.intellij.openapi.editor.Document;
 import org.json.JSONObject;
 
 class LintProcessor extends BaseProcessor {
-    LintProcessor(Document document, int lineNum) {
-        super(document, lineNum);
+    LintProcessor(Document document, int lineNum, Processors.OnProcessFinished onProcessFinished) {
+        super(document, lineNum, onProcessFinished);
     }
 
     @Override

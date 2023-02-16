@@ -66,9 +66,18 @@ public class DocumentUtils {
     public static void replaceAllText(Document document, String text) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
+                boolean isReadOnly = !document.isWritable();
+                if (isReadOnly) {
+                    document.setReadOnly(false);
+                }
+
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
                     document.deleteString(0, document.getTextLength());
                     document.insertString(0, text);
+
+                    if (isReadOnly) {
+                        document.setReadOnly(true);
+                    }
                 });
             } catch (Throwable e) {
                 throw new RuntimeException(e);
@@ -77,8 +86,17 @@ public class DocumentUtils {
     }
 
     public static void replaceTextAtLine(Document document, int lineNum, String text) {
+        replaceTextAtLine(document, lineNum, text, true);
+    }
+
+    public static void replaceTextAtLine(Document document, int lineNum, String text, boolean moveCaret) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
+                boolean isReadOnly = !document.isWritable();
+                if (isReadOnly) {
+                    document.setReadOnly(false);
+                }
+
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
                     int lineOffset = document.getLineStartOffset(lineNum);
                     int lineEndOffset = document.getLineEndOffset(lineNum);
@@ -92,12 +110,19 @@ public class DocumentUtils {
                     String indentedText = String.join("\n", lines);
 
                     document.insertString(lineOffset, indentedText);
-                    Editor editor = FileEditorManager.getInstance(getProject()).getSelectedTextEditor();
-                    if (editor != null) {
-                        int insertedLineCount = text.split("\\r?\\n").length - 1;
-                        editor.getCaretModel().moveToOffset(
-                                document.getLineEndOffset(lineNum + insertedLineCount)
-                        );
+
+                    if (moveCaret) {
+                        Editor editor = FileEditorManager.getInstance(getProject()).getSelectedTextEditor();
+                        if (editor != null) {
+                            int insertedLineCount = text.split("\\r?\\n").length - 1;
+                            editor.getCaretModel().moveToOffset(
+                                    document.getLineEndOffset(lineNum + insertedLineCount)
+                            );
+                        }
+                    }
+
+                    if (isReadOnly) {
+                        document.setReadOnly(true);
                     }
                 });
             } catch (Throwable e) {

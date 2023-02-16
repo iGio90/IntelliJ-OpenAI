@@ -36,7 +36,7 @@ public class Processors {
         return PropertiesComponent.getInstance().getValue("openai_api_key", "");
     }
 
-    public void processCode(Document document, int lineNum, String query) {
+    public void processCode(Document document, int lineNum, String query, OnProcessFinished onProcessFinished) {
         ApplicationManager.getApplication().runReadAction(() -> {
             String language = DocumentUtils.getLanguage(document);
             if (language == null) {
@@ -53,16 +53,20 @@ public class Processors {
                     document.getLineStartOffset(lineNum)
             );
             new CodeProcessor(
-                    document, lineNum, currentIndentCount, query, language
+                    document, lineNum, currentIndentCount, query, language, onProcessFinished
             ).start();
         });
     }
 
-    public void processDoc(Document document, int lineNum) {
-        new DocProcessor(document, lineNum).start();
+    public void processDoc(Document document, int lineNum, OnProcessFinished onProcessFinished) {
+        new DocProcessor(document, lineNum, onProcessFinished).start();
     }
 
-    public void processLint(Document document, int lineNum) {
-        new LintProcessor(document, lineNum).start();
+    public void processLint(Document document, int lineNum, OnProcessFinished onProcessFinished) {
+        new LintProcessor(document, lineNum, onProcessFinished).start();
+    }
+
+    public interface OnProcessFinished {
+        void onProcessFinished();
     }
 }
