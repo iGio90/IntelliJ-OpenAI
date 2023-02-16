@@ -5,7 +5,7 @@ straight in the code editor.
 ### Setup
 
 1) download the jar from the [release page](https://github.com/iGio90/IntelliJ-OpenAI/releases).
-2) install as a regular plugin from disk ([read here](https://www.jetbrains.com/help/idea/managing-plugins.html))
+2) install as a regular plugin from disk ([read here](https://www.jetbrains.com/help/idea/managing-plugins.html#install_plugin_from_disk))
 3) click the tools menu -> OpenAI Preferences and insert your api key
 
 ### Or build it yourself
