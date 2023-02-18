@@ -197,6 +197,15 @@ public class Listener implements DocumentListener {
                         );
                         break;
                 }
+
+                while (indicator.isIndeterminate()) {
+                    // this will wait until the indicator is set to not indeterminate and prevent it from disappear
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
         }.queue();
     }

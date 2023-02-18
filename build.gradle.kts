@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.igio90.intellij.openai"
-version = "1.2"
+version = "1.2.1"
 
 repositories {
     gradlePluginPortal()
