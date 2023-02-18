@@ -35,8 +35,6 @@ and so on for all other languages.
 
 this will use different models according to the need.
 
-if you need ChatGPT instead, you can open a panel which embeds it by enabling it in ``View``->``Tool Windows``->``ChatGPT``
-
 ----
 
 ### keywords:

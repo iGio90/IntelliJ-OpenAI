@@ -23,14 +23,6 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <editorFactoryDocumentListener implementation="com.igio90.intellij.openai.Listener" />
-
-        <toolWindow
-                id="ChatGPT"
-                anchor="right"
-                factoryClass="com.igio90.intellij.openai.ChatGPT"
-                icon="/tw.svg"
-                secondary="false">
-        </toolWindow>
     </extensions>
 
     <actions>
