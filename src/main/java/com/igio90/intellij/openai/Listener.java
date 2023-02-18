@@ -1,7 +1,9 @@
 package com.igio90.intellij.openai;
 
 import com.igio90.intellij.openai.processors.Processors;
+import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.ide.util.PropertiesComponent;
+import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
@@ -11,7 +13,6 @@ import com.intellij.openapi.util.TextRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Listener implements DocumentListener {
     public static final int PROMPT_TYPE_NONE = -1;
@@ -19,8 +20,22 @@ public class Listener implements DocumentListener {
     public static final int PROMPT_TYPE_DOC = 1;
     public static final int PROMPT_TYPE_STYLE = 2;
 
+    private final UndoManager mUndoManager;
+
+    public Listener() {
+        mUndoManager = UndoManager.getInstance(DocumentUtils.getProject());
+    }
+
     @Override
-    public void documentChanged(DocumentEvent event) {
+    public void beforeDocumentChange(@NotNull DocumentEvent event) {
+    }
+
+    @Override
+    public void documentChanged(@NotNull DocumentEvent event) {
+        if (mUndoManager.isUndoOrRedoInProgress()) {
+            return;
+        }
+
         Document document = event.getDocument();
         int offset = event.getOffset();
         int length = event.getNewLength();
@@ -54,38 +69,55 @@ public class Listener implements DocumentListener {
         }
 
         String commentKeyword = words[1];
-        boolean skipDotCheck = false;
-        int promptType = switch (commentKeyword) {
-            case "code" -> PROMPT_TYPE_CODE;
-            case "document", "document." -> PROMPT_TYPE_DOC;
-            default -> PROMPT_TYPE_NONE;
-        };
+        String endStr = null;
+
+        int promptType = PROMPT_TYPE_NONE;
+        switch (commentKeyword) {
+            case "code":
+            case "add":
+                promptType = PROMPT_TYPE_CODE;
+                break;
+            case "document":
+                promptType = PROMPT_TYPE_DOC;
+                break;
+        }
 
         if (promptType == PROMPT_TYPE_NONE) {
             if (words.length < 3) {
                 return;
             }
-            skipDotCheck = true;
 
             if (commentKeyword.equals("generate") || commentKeyword.equals("create")) {
-                promptType = switch (words[2]) {
-                    case "code" -> PROMPT_TYPE_CODE;
-                    case "doc" -> PROMPT_TYPE_DOC;
-                    default -> PROMPT_TYPE_NONE;
-                };
+                switch (words[2]) {
+                    case "code":
+                        promptType = PROMPT_TYPE_CODE;
+                        break;
+                    case "doc":
+                        promptType = PROMPT_TYPE_DOC;
+                        break;
+                }
             } else if (commentKeyword.equals("apply")) {
-                promptType = switch (words[2]) {
-                    case "lint", "style" -> PROMPT_TYPE_STYLE;
-                    default -> PROMPT_TYPE_NONE;
-                };
+                switch (words[2]) {
+                    case "lint":
+                    case "style":
+                        promptType = PROMPT_TYPE_STYLE;
+                        break;
+                }
             }
+        } else {
+            endStr = ".";
         }
 
         if (promptType == PROMPT_TYPE_NONE) {
             return;
         }
 
-        if (!skipDotCheck && !words[words.length - 1].endsWith(".")) {
+        if (commentMarker.equals("<!--")) {
+            // in those comment cases, endStr has to be replaced with what ends the comment for the current code lang
+            endStr = "-->";
+        }
+
+        if (endStr != null && !words[words.length - 1].endsWith(endStr)) {
             return;
         }
 
@@ -116,63 +148,51 @@ public class Listener implements DocumentListener {
     }
 
     private void process(Document document, int lineNum, int promptType, String query) {
-        AtomicBoolean isGenerating = new AtomicBoolean(true);
+        String label = "";
+        switch (promptType) {
+            case PROMPT_TYPE_CODE:
+                label = "Generating code...";
+                break;
+            case PROMPT_TYPE_DOC:
+                label = "Generating doc...";
+                break;
+            case PROMPT_TYPE_STYLE:
+                label = "Applying stylus improvements...";
+                break;
+        }
 
-        String label = switch (promptType) {
-            case PROMPT_TYPE_CODE -> "Generating code";
-            case PROMPT_TYPE_DOC -> "Generating documentation";
-            case PROMPT_TYPE_STYLE -> "Applying stylus improvements";
-            default -> throw new RuntimeException("unknown prompt type: " + promptType);
-        };
-
-        document.setReadOnly(true);
-
-        new Task.Backgroundable(DocumentUtils.getProject(), label) {
+        String finalLabel = label;
+        new Task.Backgroundable(DocumentUtils.getProject(), finalLabel) {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 Processors.OnProcessFinished onProcessFinished = () -> {
-                    isGenerating.set(false);
                     indicator.setIndeterminate(false);
-                    document.setReadOnly(false);
                 };
 
-                indicator.setText(label + ".");
+                indicator.setText(finalLabel);
                 indicator.setFraction(0);
                 indicator.setIndeterminate(true);
 
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + label + "...", false);
+                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + finalLabel);
 
                 switch (promptType) {
-                    case PROMPT_TYPE_CODE -> Processors.getInstance().processCode(
+                    case PROMPT_TYPE_CODE:
+                        Processors.getInstance().processCode(
                             document, lineNum, query, onProcessFinished
-                    );
-                    case PROMPT_TYPE_DOC -> Processors.getInstance().processDoc(
+                        );
+                        break;
+                    case PROMPT_TYPE_DOC:
+                        Processors.getInstance().processDoc(
                             document, lineNum, onProcessFinished
-                    );
-                    case PROMPT_TYPE_STYLE -> Processors.getInstance().processLint(
+                        );
+                        break;
+                    case PROMPT_TYPE_STYLE:
+                        Processors.getInstance().processLint(
                             document, lineNum, onProcessFinished
-                    );
+                        );
+                        break;
                 }
             }
         }.queue();
-
-        Thread thread = new Thread(() -> {
-            int dotCount = 1;
-
-            while (isGenerating.get()) {
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + label + ".".repeat(dotCount), false);
-
-                try {
-                    //noinspection BusyWait
-                    Thread.sleep(500);
-                } catch (InterruptedException ignored) {}
-
-                dotCount += 1;
-                if (dotCount > 3) {
-                    dotCount = 1;
-                }
-            }
-        });
-        thread.start();
     }
 }

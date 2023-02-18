@@ -1,6 +1,6 @@
 package com.igio90.intellij.openai.processors;
 
-import com.igio90.intellij.openai.DocumentUtils;
+import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.openapi.editor.Document;
 import org.json.JSONObject;
 
@@ -17,9 +17,7 @@ class LintProcessor extends BaseProcessor {
     @Override
     protected JSONObject getRequestObject() {
         JSONObject object = new JSONObject();
-        String documentText = getDocument().getText();
-        String[] lines = documentText.split("\n");
-        documentText = documentText.replace(lines[getLineNum()] + "\n", "").replaceAll("\n\n", "\n");
+        String documentText = getDocumentTextWithoutTriggerLine();
 
         object.put("input", documentText);
         object.put(

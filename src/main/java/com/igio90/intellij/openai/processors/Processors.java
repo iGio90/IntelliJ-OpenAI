@@ -1,6 +1,6 @@
 package com.igio90.intellij.openai.processors;
 
-import com.igio90.intellij.openai.DocumentUtils;
+import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Document;

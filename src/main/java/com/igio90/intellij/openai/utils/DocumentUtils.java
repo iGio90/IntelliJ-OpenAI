@@ -1,25 +1,47 @@
-package com.igio90.intellij.openai;
+package com.igio90.intellij.openai.utils;
 
 import com.intellij.application.options.CodeStyle;
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
-import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.*;
+import com.intellij.openapi.editor.impl.DocumentMarkupModel;
+import com.intellij.openapi.editor.markup.*;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.fileTypes.LanguageFileType;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
+import com.intellij.ui.JBColor;
 import com.intellij.util.ThrowableRunnable;
 
+import java.awt.*;
+
 public class DocumentUtils {
+    public static final JBColor DARK_GREEN = new JBColor("darkgreen", JBColor.GREEN.darker().darker());
+
     public static Project getProject() {
         return ProjectManager.getInstance().getOpenProjects()[0];
+    }
+
+    public static Document getCurrentDocument() {
+        return getCurrentDocument(getProject());
+    }
+
+    public static Document getCurrentDocument(Project project) {
+        FileEditorManager editorManager = FileEditorManager.getInstance(project);
+        VirtualFile[] selectedFiles = editorManager.getSelectedFiles();
+        if (selectedFiles.length > 0) {
+            VirtualFile selectedFile = selectedFiles[0];
+            return FileDocumentManager.getInstance().getDocument(selectedFile);
+        }
+        return null;
     }
 
     public static PsiFile getCurrentFile(Document document) {
@@ -36,6 +58,16 @@ public class DocumentUtils {
             }
         }
         return null;
+    }
+
+    public static RangeHighlighter highlightRange(Document document, int start, int end, JBColor color) {
+        MarkupModel markupModel = DocumentMarkupModel.forDocument(document, DocumentUtils.getProject(), false);
+        return markupModel.addRangeHighlighter(start, end, HighlighterLayer.SELECTION, new TextAttributes(null, color, null, null, Font.PLAIN), HighlighterTargetArea.EXACT_RANGE);
+    }
+
+    public static void clearHighlightRange(Document document, RangeHighlighter highlighter) {
+        MarkupModel markupModel = DocumentMarkupModel.forDocument(document, DocumentUtils.getProject(), false);
+        markupModel.removeHighlighter(highlighter);
     }
 
     public static int getDefaultIndentSize(Document document) {
@@ -63,21 +95,28 @@ public class DocumentUtils {
         return CodeStyleManager.getInstance(getProject()).getLineIndent(document, lineOffset);
     }
 
+    public static void removeLine(Document document, int lineNum) {
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
+                    document.replaceString(
+                            document.getLineStartOffset(lineNum),
+                            document.getLineEndOffset(lineNum) + 1,
+                            ""
+                    );
+                });
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
     public static void replaceAllText(Document document, String text) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                boolean isReadOnly = !document.isWritable();
-                if (isReadOnly) {
-                    document.setReadOnly(false);
-                }
-
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
                     document.deleteString(0, document.getTextLength());
                     document.insertString(0, text);
-
-                    if (isReadOnly) {
-                        document.setReadOnly(true);
-                    }
                 });
             } catch (Throwable e) {
                 throw new RuntimeException(e);
@@ -92,11 +131,6 @@ public class DocumentUtils {
     public static void replaceTextAtLine(Document document, int lineNum, String text, boolean moveCaret) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
-                boolean isReadOnly = !document.isWritable();
-                if (isReadOnly) {
-                    document.setReadOnly(false);
-                }
-
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
                     int lineOffset = document.getLineStartOffset(lineNum);
                     int lineEndOffset = document.getLineEndOffset(lineNum);
@@ -112,22 +146,22 @@ public class DocumentUtils {
                     document.insertString(lineOffset, indentedText);
 
                     if (moveCaret) {
-                        Editor editor = FileEditorManager.getInstance(getProject()).getSelectedTextEditor();
-                        if (editor != null) {
-                            int insertedLineCount = text.split("\\r?\\n").length - 1;
-                            editor.getCaretModel().moveToOffset(
-                                    document.getLineEndOffset(lineNum + insertedLineCount)
-                            );
-                        }
-                    }
-
-                    if (isReadOnly) {
-                        document.setReadOnly(true);
+                        int insertedLineCount = text.split("\\r?\\n").length - 1;
+                        moveCaret(lineNum, document.getLineEndOffset(lineNum + insertedLineCount));
                     }
                 });
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    public static void moveCaret(int line, int offset) {
+        Editor editor = FileEditorManager.getInstance(getProject()).getSelectedTextEditor();
+        if (editor != null) {
+            editor.getCaretModel().moveToOffset(offset);
+            LogicalPosition position = new LogicalPosition(line, 0);
+            editor.getScrollingModel().scrollTo(position, ScrollType.CENTER);
+        }
     }
 }

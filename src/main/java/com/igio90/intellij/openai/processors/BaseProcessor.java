@@ -1,13 +1,17 @@
 package com.igio90.intellij.openai.processors;
 
-import com.igio90.intellij.openai.DocumentUtils;
+import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.openapi.editor.Document;
 import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 abstract class BaseProcessor extends Thread {
     private final Document mDocument;
@@ -17,15 +21,11 @@ abstract class BaseProcessor extends Thread {
     private final String mLanguage;
     private final Processors.OnProcessFinished mOnProcessFinished;
 
-    BaseProcessor(Document document, Processors.OnProcessFinished onProcessFinished) {
-        this(document, 0, onProcessFinished);
-    }
-
-    BaseProcessor(Document document, int lineNum, Processors.OnProcessFinished onProcessFinished) {
+    BaseProcessor(Document document, int lineNum, @NotNull Processors.OnProcessFinished onProcessFinished) {
         this(document, lineNum, 0, null, null, onProcessFinished);
     }
 
-    BaseProcessor(Document document, int lineNum, int currentIndent, String query, String language, Processors.OnProcessFinished onProcessFinished) {
+    BaseProcessor(Document document, int lineNum, int currentIndent, String query, String language, @NotNull Processors.OnProcessFinished onProcessFinished) {
         mDocument = document;
         mLineNum = lineNum;
         mCurrentIndent = currentIndent;
@@ -59,6 +59,12 @@ abstract class BaseProcessor extends Thread {
     protected abstract JSONObject getRequestObject();
 
     protected abstract void onResponse(String content);
+
+    protected String getDocumentTextWithoutTriggerLine() {
+        List<String> lines = new ArrayList<>(List.of(getDocument().getText().split("\n")));
+        lines.remove(getLineNum());
+        return String.join("\n", lines);
+    }
 
     @Override
     public void run() {
@@ -98,8 +104,6 @@ abstract class BaseProcessor extends Thread {
             );
         }
 
-        if (mOnProcessFinished != null) {
-            mOnProcessFinished.onProcessFinished();
-        }
+        mOnProcessFinished.onProcessFinished();
     }
 }

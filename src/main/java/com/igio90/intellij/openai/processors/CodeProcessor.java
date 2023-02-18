@@ -1,8 +1,20 @@
 package com.igio90.intellij.openai.processors;
 
-import com.igio90.intellij.openai.DocumentUtils;
+import com.igio90.intellij.openai.utils.DocumentUtils;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.event.DocumentEvent;
+import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
+import com.intellij.ui.JBColor;
+import com.intellij.util.ThrowableRunnable;
+import com.intellij.util.ui.UIUtil;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 class CodeProcessor extends BaseProcessor {
     CodeProcessor(Document document, int lineNum, int currentIndent, String query, String language, Processors.OnProcessFinished onProcessFinished) {
@@ -29,9 +41,7 @@ class CodeProcessor extends BaseProcessor {
             object.put("model", "text-davinci-003");
             object.put("n", 1);
         } else {
-            String documentText = getDocument().getText();
-            String[] lines = documentText.split("\n");
-            documentText = documentText.replace(lines[getLineNum()] + "\n", "").replaceAll("\n\n", "\n");
+            String documentText = getDocumentTextWithoutTriggerLine();
 
             object.put("input", documentText);
             object.put("instruction", getQuery());
@@ -44,6 +54,19 @@ class CodeProcessor extends BaseProcessor {
 
     @Override
     protected void onResponse(String content) {
+        String contentBefore = getDocumentTextWithoutTriggerLine();
+
+        List<Integer> changedLines = new ArrayList<>();
+        List<String> originalLines = new ArrayList<>(List.of(contentBefore.split("\n")));
+        List<String> newLines = List.of(content.split("\n"));
+
+        for (int i = 0; i < originalLines.size() && i < newLines.size(); i++) {
+            if (!originalLines.get(i).equals(newLines.get(i))) {
+                changedLines.add(i);
+                originalLines.add(i, newLines.get(i));
+            }
+        }
+
         if (getCurrentIndent() == 0) {
             DocumentUtils.replaceTextAtLine(
                     getDocument(),
@@ -56,5 +79,50 @@ class CodeProcessor extends BaseProcessor {
                     content
             );
         }
+
+        ArrayList<RangeHighlighter> highlighters = new ArrayList<>();
+        ApplicationManager.getApplication().invokeLater(() -> {
+            try {
+                WriteCommandAction.writeCommandAction(DocumentUtils.getProject()).run((ThrowableRunnable<Throwable>) () -> {
+                    if (!changedLines.isEmpty()) {
+                        for (int i=0;i<changedLines.size();i++) {
+                            int line = changedLines.get(i);
+                            if (i == 0) {
+                                DocumentUtils.moveCaret(
+                                        line, getDocument().getLineStartOffset(line)
+                                );
+                            }
+                            highlighters.add(
+                                    DocumentUtils.highlightRange(
+                                            getDocument(),
+                                            getDocument().getLineStartOffset(line),
+                                            getDocument().getLineEndOffset(line),
+                                            UIUtil.isUnderDarcula() ? DocumentUtils.DARK_GREEN : JBColor.GREEN
+                                    )
+                            );
+                        }
+                    }
+
+                    if (!highlighters.isEmpty()) {
+                        getDocument().addDocumentListener(new DocumentListener() {
+                            @Override
+                            public void documentChanged(@NotNull DocumentEvent event) {
+                                if (getDocument().getText().length() != contentBefore.length()) {
+                                    for (RangeHighlighter rangeHighlighter : highlighters) {
+                                        DocumentUtils.clearHighlightRange(
+                                                getDocument(),
+                                                rangeHighlighter
+                                        );
+                                    }
+                                }
+                                getDocument().removeDocumentListener(this);
+                            }
+                        });
+                    }
+                });
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
 }

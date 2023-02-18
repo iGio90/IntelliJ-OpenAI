@@ -8,7 +8,7 @@ works with any intelliJ powered IDE, including Android Studio.
 
 1) download the jar from the [release page](https://github.com/iGio90/IntelliJ-OpenAI/releases).
 2) install as a regular plugin from disk ([read here](https://www.jetbrains.com/help/idea/managing-plugins.html#install_plugin_from_disk))
-3) click the tools menu -> OpenAI Preferences and insert your api key
+3) click the tool menu -> OpenAI Preferences and insert your api key
 
 ### Or build it yourself
 
@@ -38,12 +38,18 @@ comment in your editor with that format:
 
 and so on for all other languages. 
 
+this will use different models according to the need.
+
+if you need ChatGPT instead, you can open a panel which embeds it by enabling it in ``View``->``Tool Windows``->``ChatGPT``
+
 ----
 
 ### keywords:
 
 #### generating code:
 ``code`` query ``.`` or ``generate code`` query
+
+``add`` query ``.``
 
 #### documenting classes and methods 
 ``document.`` or ``document`` query ``.`` or ```generate doc``` 
