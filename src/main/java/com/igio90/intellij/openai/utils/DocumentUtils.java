@@ -92,7 +92,8 @@ public class DocumentUtils {
     }
 
     public static String getCurrentIndent(Document document, int lineOffset) {
-        return CodeStyleManager.getInstance(getProject()).getLineIndent(document, lineOffset);
+        String indent = CodeStyleManager.getInstance(getProject()).getLineIndent(document, lineOffset);
+        return indent == null ? "" : indent;
     }
 
     public static void removeLine(Document document, int lineNum) {

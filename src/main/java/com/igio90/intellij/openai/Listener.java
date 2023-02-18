@@ -32,6 +32,11 @@ public class Listener implements DocumentListener {
 
     @Override
     public void documentChanged(@NotNull DocumentEvent event) {
+        if (event.getNewLength() <= event.getOldLength()) {
+            // can we assume the user deleted or cut out some text and thus the real intention is not to query ai?
+            return;
+        }
+
         if (mUndoManager.isUndoOrRedoInProgress()) {
             return;
         }

@@ -30,11 +30,6 @@ comment in your editor with that format:
 # code a class which has 2 static string named X and Y and its getter and setters.
 ```
 
-```java
-// code a function that sum 2 numbers.
-
-// code a class which has 2 static string named X and Y and its getter and setters.
-```
 
 and so on for all other languages. 
 
