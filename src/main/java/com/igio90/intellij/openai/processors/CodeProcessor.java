@@ -4,16 +4,22 @@ import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.event.CaretEvent;
+import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.ui.JBColor;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
+import name.fraser.neil.plaintext.diff_match_patch;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 class CodeProcessor extends BaseProcessor {
@@ -57,14 +63,22 @@ class CodeProcessor extends BaseProcessor {
         String contentBefore = getDocumentTextWithoutTriggerLine();
 
         List<Integer> changedLines = new ArrayList<>();
-        List<String> originalLines = new ArrayList<>(List.of(contentBefore.split("\n")));
-        List<String> newLines = List.of(content.split("\n"));
-
-        for (int i = 0; i < originalLines.size() && i < newLines.size(); i++) {
-            if (!originalLines.get(i).equals(newLines.get(i))) {
-                changedLines.add(i);
-                originalLines.add(i, newLines.get(i));
+        LinkedList<diff_match_patch.Diff> diffs = new diff_match_patch().diff_main(contentBefore, content);
+        int lineNum = 0;
+        for (diff_match_patch.Diff diff : diffs) {
+            String[] lines = diff.text.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                if (diff.operation != diff_match_patch.Operation.EQUAL) {
+                    changedLines.add(lineNum);
+                }
+                if (i < lines.length - 1) {
+                    lineNum++;
+                }
             }
+        }
+        if (changedLines.size() > 1) {
+            // unsure if this is correct, but I saw it always highlight an extra line
+            changedLines.remove(changedLines.size() - 1);
         }
 
         if (getCurrentIndent() == 0) {
@@ -104,9 +118,10 @@ class CodeProcessor extends BaseProcessor {
                     }
 
                     if (!highlighters.isEmpty()) {
-                        getDocument().addDocumentListener(new DocumentListener() {
+                        Editor editor = FileEditorManager.getInstance(DocumentUtils.getProject()).getSelectedTextEditor();
+                        editor.getCaretModel().addCaretListener(new CaretListener() {
                             @Override
-                            public void documentChanged(@NotNull DocumentEvent event) {
+                            public void caretPositionChanged(@NotNull CaretEvent event) {
                                 if (getDocument().getText().length() != contentBefore.length()) {
                                     for (RangeHighlighter rangeHighlighter : highlighters) {
                                         DocumentUtils.clearHighlightRange(
@@ -115,7 +130,7 @@ class CodeProcessor extends BaseProcessor {
                                         );
                                     }
                                 }
-                                getDocument().removeDocumentListener(this);
+                                editor.getCaretModel().removeCaretListener(this);
                             }
                         });
                     }

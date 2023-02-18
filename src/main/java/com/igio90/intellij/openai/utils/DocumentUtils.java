@@ -85,9 +85,6 @@ public class DocumentUtils {
 
     public static int getCurrentIndentCount(Document document, int lineOffset) {
         String indent = getCurrentIndent(document, lineOffset);
-        if (indent == null) {
-            return 0;
-        }
         return indent.length();
     }
 
