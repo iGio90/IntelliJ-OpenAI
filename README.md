@@ -42,10 +42,10 @@ this will use different models according to the need.
 #### generating code:
 ``code`` query ``.`` or ``generate code`` query
 
-``add`` query ``.``
+``add`` query ``.`` or ``create`` query ``.``
 
 #### documenting classes and methods 
-``document.`` or ``document`` query ``.`` or ```generate doc``` 
+``document`` query ``.`` or ```generate doc``` 
 
 right before the code to document
 
