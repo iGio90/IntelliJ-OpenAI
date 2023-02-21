@@ -3,6 +3,7 @@ package com.igio90.intellij.openai.utils;
 import com.intellij.application.options.CodeStyle;
 import com.intellij.lang.Language;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.impl.DocumentMarkupModel;
@@ -109,12 +110,21 @@ public class DocumentUtils {
         });
     }
 
-    public static void replaceAllText(Document document, String text) {
+    public static void replaceAllText(Document document, String text, String actionName) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
-                    document.deleteString(0, document.getTextLength());
-                    document.insertString(0, text);
+                    CommandProcessor.getInstance().executeCommand(
+                            DocumentUtils.getProject(),
+                            () -> {
+                                document.deleteString(0, document.getTextLength());
+                                document.insertString(0, text);
+                                CommandProcessor.getInstance().setCurrentCommandName(actionName);
+                            },
+                            actionName,
+                            actionName,
+                            document
+                    );
                 });
             } catch (Throwable e) {
                 throw new RuntimeException(e);
@@ -122,36 +132,60 @@ public class DocumentUtils {
         });
     }
 
-    public static void replaceTextAtLine(Document document, int lineNum, String text) {
-        replaceTextAtLine(document, lineNum, text, true);
+    public static void replaceTextAtLine(Document document, int lineNum, String text, String actionName) {
+        replaceTextAtLine(document, lineNum, text, actionName, true);
     }
 
-    public static void replaceTextAtLine(Document document, int lineNum, String text, boolean moveCaret) {
+    public static void replaceTextAtLine(
+            Document document,
+            int lineNum,
+            String text,
+            String actionName,
+            boolean moveCaret
+    ) {
         ApplicationManager.getApplication().invokeLater(() -> {
             try {
                 WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
-                    int lineOffset = document.getLineStartOffset(lineNum);
-                    int lineEndOffset = document.getLineEndOffset(lineNum);
-                    document.deleteString(lineOffset, lineEndOffset);
-                    String indent = getCurrentIndent(document, lineOffset);
-
-                    String[] lines = text.split("\n");
-                    for (int i = 0; i < lines.length; i++) {
-                        lines[i] = indent + lines[i];
-                    }
-                    String indentedText = String.join("\n", lines);
-
-                    document.insertString(lineOffset, indentedText);
-
-                    if (moveCaret) {
-                        int insertedLineCount = text.split("\\r?\\n").length - 1;
-                        moveCaret(lineNum, document.getLineEndOffset(lineNum + insertedLineCount));
-                    }
+                    CommandProcessor.getInstance().executeCommand(
+                            DocumentUtils.getProject(),
+                            internalReplaceTextAtLine(document, lineNum, text, actionName, moveCaret),
+                            actionName,
+                            actionName,
+                            document
+                    );
                 });
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    private static Runnable internalReplaceTextAtLine(
+            Document document, int lineNum, String text, String actionName, boolean moveCaret
+    ) {
+        return () -> {
+            int lineOffset = document.getLineStartOffset(lineNum);
+            int lineEndOffset = document.getLineEndOffset(lineNum);
+            document.deleteString(lineOffset, lineEndOffset);
+            String indent = getCurrentIndent(document, lineOffset);
+
+            String[] lines = text.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                lines[i] = indent + lines[i];
+            }
+            String indentedText = String.join("\n", lines);
+
+            document.insertString(lineOffset, indentedText);
+
+            if (moveCaret) {
+                int insertedLineCount = text.split("\\r?\\n").length - 1;
+                moveCaret(lineNum, document.getLineEndOffset(lineNum + insertedLineCount));
+            }
+
+            if (actionName != null) {
+                CommandProcessor.getInstance().setCurrentCommandName(actionName);
+            }
+        };
     }
 
     public static void moveCaret(int line, int offset) {

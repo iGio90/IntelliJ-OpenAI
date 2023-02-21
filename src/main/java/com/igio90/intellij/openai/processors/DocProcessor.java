@@ -4,8 +4,6 @@ import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.openapi.editor.Document;
 import org.json.JSONObject;
 
-import java.util.List;
-
 class DocProcessor extends BaseProcessor {
     DocProcessor(Document document, int lineNum, Processors.OnProcessFinished onProcessFinished) {
         super(document, lineNum, onProcessFinished);
@@ -52,7 +50,8 @@ class DocProcessor extends BaseProcessor {
         DocumentUtils.replaceTextAtLine(
                 getDocument(),
                 getLineNum(),
-                content
+                content,
+                "doc gen"
         );
     }
 }

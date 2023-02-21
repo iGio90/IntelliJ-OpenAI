@@ -85,7 +85,8 @@ abstract class BaseProcessor extends Thread {
                 DocumentUtils.replaceTextAtLine(
                         getDocument(),
                         getLineNum(),
-                        "// failed to generate code... http response code: " + response.code()
+                        "// failed to generate code... http response code: " + response.code(),
+                        "code gen"
                 );
                 return;
             }
@@ -97,10 +98,13 @@ abstract class BaseProcessor extends Thread {
         } catch (Throwable e) {
             e.printStackTrace();
 
+            String[] errorMessage = e.getMessage().split("\n");
+
             DocumentUtils.replaceTextAtLine(
                     getDocument(),
                     getLineNum(),
-                    "// failed to generate code... error: " + e.getMessage()
+                    "// failed to generate code... error: " + String.join("\n// ", errorMessage),
+                    "code gen"
             );
         }
 

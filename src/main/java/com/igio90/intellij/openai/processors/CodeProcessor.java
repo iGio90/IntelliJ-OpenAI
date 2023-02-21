@@ -7,8 +7,6 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.CaretEvent;
 import com.intellij.openapi.editor.event.CaretListener;
-import com.intellij.openapi.editor.event.DocumentEvent;
-import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.ui.JBColor;
@@ -67,6 +65,7 @@ class CodeProcessor extends BaseProcessor {
         int lineNum = 0;
         for (diff_match_patch.Diff diff : diffs) {
             String[] lines = diff.text.split("\n");
+            System.out.println("diff - op:" + diff.operation.name() + " " + diff.text);
             for (int i = 0; i < lines.length; i++) {
                 if (diff.operation != diff_match_patch.Operation.EQUAL) {
                     changedLines.add(lineNum);
@@ -85,12 +84,14 @@ class CodeProcessor extends BaseProcessor {
             DocumentUtils.replaceTextAtLine(
                     getDocument(),
                     getLineNum(),
-                    content
+                    content,
+                    "code gen"
             );
         } else {
             DocumentUtils.replaceAllText(
                     getDocument(),
-                    content
+                    content,
+                    "code gen"
             );
         }
 

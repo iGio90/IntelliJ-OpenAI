@@ -34,7 +34,8 @@ class LintProcessor extends BaseProcessor {
     protected void onResponse(String content) {
         DocumentUtils.replaceAllText(
                 getDocument(),
-                content
+                content,
+                "lint gen"
         );
     }
 }

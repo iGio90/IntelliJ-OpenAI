@@ -43,7 +43,8 @@ public class Processors {
                 DocumentUtils.replaceTextAtLine(
                         document,
                         lineNum,
-                        "// failed to generate code... no language identified from file"
+                        "// failed to generate code... no language identified from file",
+                        "code gen"
                 );
                 return;
             }

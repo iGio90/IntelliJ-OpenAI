@@ -5,8 +5,10 @@ import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.command.undo.UndoManager;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.util.TextRange;
@@ -139,7 +141,8 @@ public class Listener implements DocumentListener {
             DocumentUtils.replaceTextAtLine(
                     document,
                     lineNum,
-                    "// insert an openai api key in tools menu -> OpenAI Preferences"
+                    "// insert an openai api key in tools menu -> OpenAI Preferences",
+                    "code gen"
             );
             return;
         }
@@ -172,13 +175,15 @@ public class Listener implements DocumentListener {
             public void run(@NotNull ProgressIndicator indicator) {
                 Processors.OnProcessFinished onProcessFinished = () -> {
                     indicator.setIndeterminate(false);
+                    // document.setReadOnly(false);
                 };
 
                 indicator.setText(finalLabel);
                 indicator.setFraction(0);
                 indicator.setIndeterminate(true);
 
-                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + finalLabel);
+                DocumentUtils.replaceTextAtLine(document, lineNum, "// " + finalLabel, "code gen");
+                // document.setReadOnly(true);
 
                 switch (promptType) {
                     case PROMPT_TYPE_CODE:
