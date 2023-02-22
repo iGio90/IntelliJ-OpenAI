@@ -216,7 +216,11 @@ public class Modal extends AnAction {
                                             }
                                         });
                                     } catch (Throwable e) {
-                                        throw new RuntimeException(e);
+                                        e.printStackTrace();
+
+                                        String[] errorMessage = e.getMessage().split("\n");
+                                        errorNotification(project, "Exception performing request\n: " + String.join("\n", errorMessage));
+                                        break;
                                     }
                                 });
                             } catch (Throwable e) {

@@ -69,13 +69,21 @@ public class CreateCode implements IAction {
                         public void run(@NotNull ProgressIndicator indicator) {
                             String newCode;
 
-                            var queryObj = OpenAiInputManager.getAiQueryCommand(documentContent, query);
-                            Request request = OpenAiInputManager.openAiGeneralRequest(queryObj);
-                            try (Response response = OpenAiInputManager.response(request)) {
-                                if (!response.isSuccessful() || response.body() == null) {
-                                    return;
+                            try {
+                                JSONObject object = new JSONObject();
+                                object.put("input", documentContent);
+                                object.put("instruction", query);
+                                object.put("temperature", 0.2);
+                                object.put("model", "code-davinci-edit-001");
+                                object.put("n", 1);
+
+                                Request request = OpenAiInputManager.openAiGeneralRequest(object);
+                                try (Response response = OpenAiInputManager.response(request)) {
+                                    if (!response.isSuccessful() || response.body() == null) {
+                                        return;
+                                    }
+                                    object = new JSONObject(response.body().string());
                                 }
-                                var object = new JSONObject(response.body().string());
                                 JSONArray choices = object.getJSONArray("choices");
                                 newCode = choices.getJSONObject(0).getString("text").replaceAll("^\\n+", "");
                             } catch (Throwable e) {
@@ -83,24 +91,24 @@ public class CreateCode implements IAction {
                                 return;
                             }
 
-                            List<Integer> changedLines = new ArrayList<>();
                             LinkedList<diff_match_patch.Diff> diffs = new diff_match_patch().diff_main(documentContent, newCode);
-                            int lineNum = 0;
+                            StringBuilder diffCode = new StringBuilder();
+                            ArrayList<Integer> changedLines = new ArrayList<>();
+                            int currentLine = 0;
                             for (diff_match_patch.Diff diff : diffs) {
-                                String[] lines = diff.text.split("\n");
-                                System.out.println("diff - op:" + diff.operation.name() + " " + diff.text);
-                                for (int i = 0; i < lines.length; i++) {
-                                    if (diff.operation != diff_match_patch.Operation.EQUAL) {
-                                        changedLines.add(lineNum);
-                                    }
-                                    if (i < lines.length - 1) {
-                                        lineNum++;
+                                if (diff.operation.equals(diff_match_patch.Operation.DELETE)) {
+                                    continue;
+                                }
+                                int diffLines = diff.text.split("\n").length;
+                                if (diff.operation.equals(diff_match_patch.Operation.EQUAL)) {
+                                    diffCode.append(diff.text);
+                                } else if (diff.operation.equals(diff_match_patch.Operation.INSERT)) {
+                                    diffCode.append(diff.text);
+                                    for (int i = 0; i < diffLines; i++) {
+                                        changedLines.add(currentLine + i);
                                     }
                                 }
-                            }
-                            if (changedLines.size() > 1) {
-                                // unsure if this is correct, but I saw it always highlight an extra line
-                                changedLines.remove(changedLines.size() - 1);
+                                currentLine += diffLines;
                             }
 
                             DocumentUtils.replaceAllText(
