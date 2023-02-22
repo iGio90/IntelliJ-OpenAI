@@ -1,5 +1,6 @@
 package com.igio90.intellij.openai;
 
+import com.igio90.intellij.openai.actions.CreateCode;
 import com.igio90.intellij.openai.actions.JumpToLine;
 import com.igio90.intellij.openai.actions.OpenFile;
 import com.intellij.ide.util.PropertiesComponent;
@@ -9,8 +10,6 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
@@ -19,7 +18,6 @@ import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.awt.RelativePoint;
-import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
 import okhttp3.*;
 import org.jetbrains.annotations.NotNull;
@@ -69,6 +67,11 @@ public class Modal extends AnAction {
 
     private JBPopup mPopup;
     private JTextField mInput;
+
+    private static final OkHttpClient sClient = new OkHttpClient.Builder()
+            .callTimeout(2, TimeUnit.MINUTES)
+            .readTimeout(2, TimeUnit.MINUTES)
+            .build();
 
     private JBPopup createPopup(JBPopupFactory factory, Project project) {
         return factory.createComponentPopupBuilder(createPopupPanel(project), null)
@@ -181,13 +184,11 @@ public class Modal extends AnAction {
                                     .post(RequestBody.create(object.toString(), MediaType.parse("application/json")))
                                     .build();
                             try {
-                                Response response = new OkHttpClient.Builder()
-                                        .callTimeout(2, TimeUnit.MINUTES)
-                                        .readTimeout(2, TimeUnit.MINUTES)
-                                        .build().newCall(request).execute();
+                                Response response = sClient.newCall(request).execute();
 
                                 if (!response.isSuccessful() || response.body() == null) {
                                     errorNotification(project, "Error performing request\nhttp response code: " + response.code());
+                                    indicator.setIndeterminate(false);
                                     return;
                                 }
 
@@ -197,40 +198,38 @@ public class Modal extends AnAction {
                                 System.out.println("open ai actions result:\n\n" + content);
                                 JSONArray actions = new JSONArray(content);
 
-                                ApplicationManager.getApplication().invokeLater(() -> {
+                                for (int i = 0; i < actions.length(); i++) {
                                     try {
-                                        WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
-                                            for (int i = 0; i < actions.length(); i++) {
-                                                try {
-                                                    JSONObject actionObject = actions.getJSONObject(i);
-                                                    String action = actionObject.getString("action");
-                                                    Object data = actionObject.get("data");
+                                        JSONObject actionObject = actions.getJSONObject(i);
+                                        String action = actionObject.getString("action");
+                                        Object data = actionObject.get("data");
 
-                                                    switch (action) {
-                                                        case "open_file":
-                                                            OpenFile.perform(project, (String) data);
-                                                            break;
-                                                        case "jump_to_line":
-                                                            JumpToLine.perform(project, (int) data);
-                                                            break;
-                                                    }
-                                                } catch (Exception e) {
-                                                    System.out.println("failed to parse actions: " + e.toString());
-                                                    // todo notify user
-                                                }
-                                            }
-                                        });
+                                        switch (action) {
+                                            case "open_file":
+                                                OpenFile.perform(project, (String) data);
+                                                break;
+                                            case "jump_to_line":
+                                                JumpToLine.perform(project, (int) data);
+                                                break;
+                                            case "create_code":
+                                                CreateCode.perform(project, (String) data);
+                                                break;
+                                        }
                                     } catch (Throwable e) {
-                                        throw new RuntimeException(e);
+                                        e.printStackTrace();
+
+                                        String[] errorMessage = e.getMessage().split("\n");
+                                        errorNotification(project, "Exception performing request\n: " + String.join("\n", errorMessage));
                                     }
-                                });
+                                }
                             } catch (Throwable e) {
                                 e.printStackTrace();
+
                                 String[] errorMessage = e.getMessage().split("\n");
                                 errorNotification(project, "Exception performing request\n: " + String.join("\n", errorMessage));
-                            }
 
-                            indicator.setIndeterminate(false);
+                                indicator.setIndeterminate(false);
+                            }
                         }
                     }.queue();
 
@@ -296,7 +295,11 @@ public class Modal extends AnAction {
         Notifications.Bus.notify(notification, project);
     }
 
-    private String getOpenAIApiKey() {
+    public static String getOpenAIApiKey() {
         return PropertiesComponent.getInstance().getValue("openai_api_key", "");
+    }
+
+    public static OkHttpClient getClient() {
+        return sClient;
     }
 }
