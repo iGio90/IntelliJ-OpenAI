@@ -27,9 +27,8 @@ public class OpenAiInputManager {
     private static final String userInputText = "given the user input:";
     private static final String criteriaText = "give me an output that match the following criteria";
 
-    private static final ArrayList<String> CRITERIA = new ArrayList<>(
-            Arrays.asList(
-                    "output must be a json array",
+    private static final Collection<String> CRITERIA =
+            List.of("output must be a json array",
                     "array must contains zero or more json objects with a two key value inside",
                     "objects must be ordered according to the user input",
                     "first key-value must have a key \"action\"",
@@ -41,9 +40,7 @@ public class OpenAiInputManager {
                     // somehow needed, or it will start assuming that the user want to perform things
                     // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
                     "do not assume the user want to perform additional actions from the input, " +
-                            "the result must include only specified actions"
-            )
-    );
+                            "the result must include only specified actions");
     public static final Set<IAction> actions = registerActions();
 
     static Set<IAction> registerActions() {

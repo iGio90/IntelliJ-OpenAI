@@ -12,6 +12,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.ui.JBColor;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
+import lombok.extern.slf4j.Slf4j;
 import name.fraser.neil.plaintext.diff_match_patch;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+@Slf4j
 class CodeProcessor extends BaseProcessor {
     CodeProcessor(Document document, int lineNum, int currentIndent, String query, String language, Processors.OnProcessFinished onProcessFinished) {
         super(document, lineNum, currentIndent, query, language, onProcessFinished);
@@ -46,7 +48,6 @@ class CodeProcessor extends BaseProcessor {
             object.put("n", 1);
         } else {
             String documentText = getDocumentTextWithoutTriggerLine();
-
             object.put("input", documentText);
             object.put("instruction", getQuery());
             object.put("temperature", 0.2);
@@ -65,7 +66,7 @@ class CodeProcessor extends BaseProcessor {
         int lineNum = 0;
         for (diff_match_patch.Diff diff : diffs) {
             String[] lines = diff.text.split("\n");
-            System.out.println("diff - op:" + diff.operation.name() + " " + diff.text);
+            log.debug("diff - op:" + diff.operation.name() + " " + diff.text);
             for (int i = 0; i < lines.length; i++) {
                 if (diff.operation != diff_match_patch.Operation.EQUAL) {
                     changedLines.add(lineNum);
@@ -100,7 +101,7 @@ class CodeProcessor extends BaseProcessor {
             try {
                 WriteCommandAction.writeCommandAction(DocumentUtils.getProject()).run((ThrowableRunnable<Throwable>) () -> {
                     if (!changedLines.isEmpty()) {
-                        for (int i=0;i<changedLines.size();i++) {
+                        for (int i = 0; i < changedLines.size(); i++) {
                             int line = changedLines.get(i);
                             if (i == 0) {
                                 DocumentUtils.moveCaret(
