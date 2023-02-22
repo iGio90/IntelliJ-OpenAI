@@ -36,7 +36,6 @@ public class OpenAiInputManager {
                     "second key-value must have a key \"data\"",
                     "second key-value value must be retrieved from the user input",
                     "second key-value value must have a data type matching what I gave you in the list before",
-                    "second key-value must be wrapped by \" if it is not a string",
                     // somehow needed, or it will start assuming that the user want to perform things
                     // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
                     "do not assume the user want to perform additional actions from the input, " +

@@ -14,5 +14,4 @@ public interface IAction {
     Collection<String> getAutoCompletion();
 
     void perform(Project project, Object... data);
-
 }
