@@ -15,10 +15,37 @@ import com.intellij.ui.components.JBList;
 
 import javax.swing.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
-public class OpenFile {
-    public static void perform(Project project, String fileName) {
+public class OpenFile implements IAction {
+
+
+    private final String actionName = "open_file";
+
+    @Override
+    public String getName() {
+        return "OpenFile";
+    }
+
+    @Override
+    public String getAction() {
+        return actionName;
+    }
+
+    @Override
+    public String getType() {
+        return "string";
+    }
+
+    @Override
+    public Collection<String> getAutoCompletion() {
+        return List.of("Open");
+    }
+
+    @Override
+    public void perform(Project project, String fileName) {
         PsiFile[] psiFiles = FilenameIndex.getFilesByName(project, fileName, GlobalSearchScope.projectScope(project));
 
         if (psiFiles.length == 0) {
@@ -58,4 +85,6 @@ public class OpenFile {
             builder.createPopup().showInBestPositionFor(DataManager.getInstance().getDataContext());
         }
     }
+
+
 }
