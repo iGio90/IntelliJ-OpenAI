@@ -15,6 +15,8 @@ repositories {
 dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.10.0")
     implementation("org.json:json:20220924")
+    compileOnly("org.projectlombok:lombok:1.18.26")
+    annotationProcessor("org.projectlombok:lombok:1.18.26")
 }
 
 // Configure Gradle IntelliJ Plugin
@@ -22,7 +24,6 @@ dependencies {
 intellij {
     version.set("2021.3.3")
     type.set("IC") // Target IDE Platform
-
     plugins.set(listOf("com.intellij.java"))
 }
 

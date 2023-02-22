@@ -1,7 +1,6 @@
 package com.igio90.intellij.openai;
 
 import com.igio90.intellij.openai.actions.OpenFile;
-import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationAction;
@@ -10,7 +9,6 @@ import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
@@ -23,6 +21,7 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
 import okhttp3.*;
+import org.jdesktop.swingx.autocomplete.AutoCompleteDecorator;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -37,6 +36,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class Modal extends AnAction {
+
+
     private static final Map<String, String> ACTIONS = Map.of(
             "open_file", "string",
             "jump_to_line", "integer",
@@ -60,7 +61,7 @@ public class Modal extends AnAction {
                     "second key-value must have a key \"data\"",
                     "second key-value value must be retrieved from the user input",
                     "second key-value value must have a data type matching what I gave you in the list before",
-                    "second key-value must be wrapped by \" if it\'s not a string",
+                    "second key-value must be wrapped by \" if it is not a string",
                     // somehow needed, or it will start assuming that the user want to perform things
                     // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
                     "do not assume the user want to perform additional actions from the input, the result must include only specified actions"
@@ -69,6 +70,27 @@ public class Modal extends AnAction {
 
     private JBPopup mPopup;
     private JTextField mInput;
+
+    private JBPopup createPopup(JBPopupFactory factory, Project project) {
+        return factory.createComponentPopupBuilder(createPopupPanel(project), null)
+                .setRequestFocus(true)
+                .setResizable(false)
+                .setCancelOnClickOutside(true)
+                .createPopup();
+    }
+
+    private int getScreenWidth() {
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        return screenSize.width / 3;
+    }
+
+    private Point getPopupPoint(Component parent, int width) {
+        Rectangle bounds = parent.getBounds();
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        int x = bounds.x + (bounds.width - width) / 2;
+        int y = bounds.y + bounds.height / 4;
+        return new Point(x, y);
+    }
 
     @Override
     public void actionPerformed(AnActionEvent event) {
@@ -79,32 +101,27 @@ public class Modal extends AnAction {
             return;
         }
 
-        JBPopupFactory factory = JBPopupFactory.getInstance();
-        mPopup = factory.createComponentPopupBuilder(createPopupPanel(project), null)
-                .setRequestFocus(true)
-                .setResizable(false)
-                .setCancelOnClickOutside(true)
-                .createPopup();
-
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int width = screenSize.width / 3;
-        mPopup.setSize(new Dimension(width, mPopup.getContent().getPreferredSize().height));
-
-        Rectangle bounds = parent.getBounds();
-        int x = bounds.x + (bounds.width - width) / 2;
-        int y = bounds.y + bounds.height / 4;
-        mPopup.show(new RelativePoint(parent, new Point(x, y)));
-
+        mPopup = createPopup(JBPopupFactory.getInstance(), project);
+        mPopup.setSize(new Dimension(getScreenWidth(), mPopup.getContent().getPreferredSize().height));
+        mPopup.show(new RelativePoint(parent, getPopupPoint(parent, getScreenWidth())));
         mInput.requestFocusInWindow();
+    }
+
+    private void addAutoCompletion(JTextField textField) {
+        //AutoCompleteDecorator.decorate(textField, items.toArray(), false);
+    }
+
+    private JTextField createJTextField() {
+        var jTextField = new JTextField();
+        jTextField.setBorder(BorderFactory.createEmptyBorder());
+        jTextField.setFont(UIUtil.getLabelFont().deriveFont(16f));
+        jTextField.setPreferredSize(new Dimension(-1, 40));
+        return jTextField;
     }
 
     private JComponent createPopupPanel(Project project) {
         JPanel panel = new JPanel(new BorderLayout());
-
-        mInput = new JTextField();
-        mInput.setBorder(BorderFactory.createEmptyBorder());
-        mInput.setFont(UIUtil.getLabelFont().deriveFont(16f));
-        mInput.setPreferredSize(new Dimension(-1, 40));
+        mInput = createJTextField();
         mInput.addKeyListener(new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e) {
@@ -118,11 +135,10 @@ public class Modal extends AnAction {
                     mInput.setForeground(JBColor.GRAY);
                     mInput.setEditable(false);
 
-                    String label = "Performing actions...";
-                    new Task.Backgroundable(project, label) {
+                    new Task.Backgroundable(project, "Processing") {
                         @Override
                         public void run(@NotNull ProgressIndicator indicator) {
-                            indicator.setText(label);
+                            indicator.setText("Performing actions...");
                             indicator.setFraction(0);
                             indicator.setIndeterminate(true);
 
@@ -186,7 +202,7 @@ public class Modal extends AnAction {
                                 ApplicationManager.getApplication().invokeLater(() -> {
                                     try {
                                         WriteCommandAction.writeCommandAction(getProject()).run((ThrowableRunnable<Throwable>) () -> {
-                                            for (int i=0;i<actions.length();i++) {
+                                            for (int i = 0; i < actions.length(); i++) {
                                                 try {
                                                     JSONObject actionObject = actions.getJSONObject(i);
                                                     String action = actionObject.getString("action");
