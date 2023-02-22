@@ -166,5 +166,3 @@ public class OpenAiInputManager {
                 .build().newCall(request).execute();
     }
 }
-
-

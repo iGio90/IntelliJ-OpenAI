@@ -70,13 +70,7 @@ public class CreateCode implements IAction {
                             String newCode;
 
                             try {
-                                JSONObject object = new JSONObject();
-                                object.put("input", documentContent);
-                                object.put("instruction", query);
-                                object.put("temperature", 0.2);
-                                object.put("model", "code-davinci-edit-001");
-                                object.put("n", 1);
-
+                                JSONObject object = OpenAiInputManager.getAiQueryCommand(documentContent, query);
                                 Request request = OpenAiInputManager.openAiGeneralRequest(object);
                                 try (Response response = OpenAiInputManager.response(request)) {
                                     if (!response.isSuccessful() || response.body() == null) {
