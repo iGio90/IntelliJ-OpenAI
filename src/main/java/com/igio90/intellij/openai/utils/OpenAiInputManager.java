@@ -1,6 +1,8 @@
 package com.igio90.intellij.openai.utils;
 
+import com.igio90.intellij.openai.actions.CreateCode;
 import com.igio90.intellij.openai.actions.IAction;
+import com.igio90.intellij.openai.actions.JumpToLine;
 import com.igio90.intellij.openai.actions.OpenFile;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
@@ -47,6 +49,8 @@ public class OpenAiInputManager {
     static Set<IAction> registerActions() {
         Set<IAction> a = new HashSet<>();
         a.add(new OpenFile());
+        a.add(new JumpToLine());
+        a.add(new CreateCode());
         return a;
     }
 
@@ -91,13 +95,23 @@ public class OpenAiInputManager {
         return sb;
     }
 
-    public static JSONObject getAiCommand(String prompt) {
+    public static JSONObject getAiTextCommand(String prompt) {
         JSONObject j = new JSONObject();
         j.put("prompt", prompt);
         j.put("stream", false);
         j.put("temperature", 0.2);
         j.put("max_tokens", 2048);
         j.put("model", "text-davinci-003");
+        j.put("n", 1);
+        return j;
+    }
+
+    public static JSONObject getAiQueryCommand(String documentContent, String query) {
+        JSONObject j = new JSONObject();
+        j.put("input", documentContent);
+        j.put("instruction", query);
+        j.put("temperature", 0.2);
+        j.put("model", "code-davinci-edit-001");
         j.put("n", 1);
         return j;
     }
@@ -119,13 +133,12 @@ public class OpenAiInputManager {
                     try {
                         JSONObject actionObject = actions.getJSONObject(i);
                         String action = actionObject.getString("action");
-                        String data = actionObject.getString("data");
+                        Object data = actionObject.get("data");
                         var actionImp = getAction(action);
                         if (actionImp.isEmpty()) {
                             log.warn("There is no action named " + action);
                         } else {
                             actionImp.get().perform(project, data);
-                            break;
                         }
                     } catch (Exception e) {
                         log.error("Failed to parse actions: " + e);
@@ -141,7 +154,7 @@ public class OpenAiInputManager {
         var aiResponse = new JSONObject(body);
         JSONArray choices = aiResponse.getJSONArray("choices");
         String content = choices.getJSONObject(0).getString("text");
-        log.info("open ai actions result:\n\n" + content);
+        log.debug("open ai actions result:\n\n" + content);
         JSONArray actions = new JSONArray(content);
         ApplicationManager.getApplication().invokeLater(() -> parseAction(project, actions));
     }

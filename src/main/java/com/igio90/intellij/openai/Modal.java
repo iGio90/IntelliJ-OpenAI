@@ -1,7 +1,7 @@
 package com.igio90.intellij.openai;
 
-import com.igio90.intellij.openai.actions.JumpToLine;
-import com.igio90.intellij.openai.actions.OpenFile;
+import com.igio90.intellij.openai.actions.IAction;
+import com.igio90.intellij.openai.utils.OpenAiInputManager;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.Notification;
 import com.intellij.notification.NotificationAction;
@@ -9,8 +9,6 @@ import com.intellij.notification.NotificationType;
 import com.intellij.notification.Notifications;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.application.ApplicationManager;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
@@ -19,54 +17,22 @@ import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.awt.RelativePoint;
-import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
-import okhttp3.*;
+import lombok.extern.slf4j.Slf4j;
+import okhttp3.Request;
+import okhttp3.Response;
+import org.jdesktop.swingx.autocomplete.AutoCompleteDecorator;
 import org.jetbrains.annotations.NotNull;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
+@Slf4j
 public class Modal extends AnAction {
-
-
-    private static final Map<String, String> ACTIONS = Map.of(
-            "open_file", "string",
-            "jump_to_line", "integer",
-            "delete_line", "integer",
-            "delete_text", "string",
-            "jump_to_function", "string",
-            "create_code", "string",
-            "create_documentation", "string",
-            "read_line", "integer",
-            "build_project", "boolean",
-            "run_project", "boolean"
-    );
-
-    private static final ArrayList<String> CRITERIA = new ArrayList<>(
-            Arrays.asList(
-                    "output must be a json array",
-                    "array must contains zero or more json objects with a two key value inside",
-                    "objects must be ordered according to the user input",
-                    "first key-value must have a key \"action\"",
-                    "first key-value must have a value that match one of the actions I gave you in the list before",
-                    "second key-value must have a key \"data\"",
-                    "second key-value value must be retrieved from the user input",
-                    "second key-value value must have a data type matching what I gave you in the list before",
-                    // somehow needed, or it will start assuming that the user want to perform things
-                    // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
-                    "do not assume the user want to perform additional actions from the input, the result must include only specified actions"
-            )
-    );
-
     private JBPopup mPopup;
     private JTextField mInput;
 
@@ -93,20 +59,20 @@ public class Modal extends AnAction {
     @Override
     public void actionPerformed(AnActionEvent event) {
         Project project = event.getProject();
-        Component parent = WindowManager.getInstance().getIdeFrame(project).getComponent();
-
+        Component parent = Objects.requireNonNull(WindowManager.getInstance().getIdeFrame(project)).getComponent();
         if (!ensureApiKey(project)) {
             return;
         }
-
         mPopup = createPopup(JBPopupFactory.getInstance(), project);
         mPopup.setSize(new Dimension(getScreenWidth(), mPopup.getContent().getPreferredSize().height));
-        mPopup.show(new RelativePoint(parent, getPopupPoint(parent, getScreenWidth())));
+        mPopup.show(
+                new RelativePoint(parent, getPopupPoint(parent, getScreenWidth())));
         mInput.requestFocusInWindow();
     }
 
     private void addAutoCompletion(JTextField textField) {
-        //AutoCompleteDecorator.decorate(textField, items.toArray(), false);
+        AutoCompleteDecorator.decorate(textField, OpenAiInputManager.actions.stream()
+                .map(IAction::getAutoCompletion).collect(Collectors.toList()), false);
     }
 
     private JTextField createJTextField() {
@@ -114,6 +80,7 @@ public class Modal extends AnAction {
         jTextField.setBorder(BorderFactory.createEmptyBorder());
         jTextField.setFont(UIUtil.getLabelFont().deriveFont(16f));
         jTextField.setPreferredSize(new Dimension(-1, 40));
+        addAutoCompletion(jTextField);
         return jTextField;
     }
 
@@ -125,15 +92,43 @@ public class Modal extends AnAction {
             public void keyReleased(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
                     final String input = mInput.getText().trim();
-
-                    if (input.isBlank()) {
+                    if (input.isBlank())
                         return;
-                    }
-
                     mInput.setForeground(JBColor.GRAY);
                     mInput.setEditable(false);
-
                     new Task.Backgroundable(project, "Processing") {
+                        @Override
+                        public void run(@NotNull ProgressIndicator indicator) {
+                            indicator.setText("Performing actions...");
+                            indicator.setFraction(0);
+                            indicator.setIndeterminate(true);
+                            var aiInput = OpenAiInputManager
+                                    .getActionSetString()
+                                    .append(OpenAiInputManager.getUserInputString(input))
+                                    .append(OpenAiInputManager.getCriteriaString()).toString();
+                            log.info("prompt:\n\n" + aiInput);
+                            Request request = OpenAiInputManager.openAiGeneralRequest(
+                                    OpenAiInputManager.getAiTextCommand(aiInput));
+                            try (Response response = OpenAiInputManager.response(request)) {
+                                if (!response.isSuccessful() || response.body() == null) {
+                                    errorNotification(project,
+                                            "Error performing request\n" +
+                                                    "http response code: " +
+                                                    response.code());
+                                    return;
+                                }
+                                OpenAiInputManager.execResponse(project, response.body().string());
+                            } catch (Throwable e) {
+                                e.printStackTrace();
+                                String[] errorMessage = e.getMessage().split("\n");
+                                errorNotification(project, "Exception performing response\n: "
+                                        + String.join("\n", errorMessage));
+                            }
+                            indicator.setIndeterminate(false);
+                        }
+                    }.queue();
+
+                    /*new Task.Backgroundable(project, "Processing") {
                         @Override
                         public void run(@NotNull ProgressIndicator indicator) {
                             indicator.setText("Performing actions...");
@@ -232,33 +227,23 @@ public class Modal extends AnAction {
 
                             indicator.setIndeterminate(false);
                         }
-                    }.queue();
-
+                    }.queue();*/
                     mPopup.closeOk(null);
                 }
             }
         });
-
         panel.add(mInput, BorderLayout.CENTER);
-
         panel.setBackground(JBColor.namedColor("OpenAI.PanelBackground", new JBColor(0xdedede, 0x3c3f41)));
-
         /*
         can be useful later for an eventual history
-
-        // Create the list of suggestions
         JList<String> list = new JBList<>();
         list.setBorder(BorderFactory.createEmptyBorder());
         list.setFont(UIUtil.getLabelFont().deriveFont(16f));
         JScrollPane scrollPane = new JBScrollPane(list);
         scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
-
-        // Add the list to the panel
         panel.add(scrollPane, BorderLayout.CENTER);
-         */
-
-        // Return the panel
+        */
         return panel;
     }
 

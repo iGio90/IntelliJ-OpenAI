@@ -13,6 +13,6 @@ public interface IAction {
 
     Collection<String> getAutoCompletion();
 
-    void perform(Project project, String fileName);
+    void perform(Project project, Object... data);
 
 }
