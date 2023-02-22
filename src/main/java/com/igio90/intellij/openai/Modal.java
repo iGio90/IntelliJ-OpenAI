@@ -1,5 +1,6 @@
 package com.igio90.intellij.openai;
 
+import com.igio90.intellij.openai.actions.JumpToLine;
 import com.igio90.intellij.openai.actions.OpenFile;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.notification.Notification;
@@ -21,7 +22,6 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
 import okhttp3.*;
-import org.jdesktop.swingx.autocomplete.AutoCompleteDecorator;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -61,7 +61,6 @@ public class Modal extends AnAction {
                     "second key-value must have a key \"data\"",
                     "second key-value value must be retrieved from the user input",
                     "second key-value value must have a data type matching what I gave you in the list before",
-                    "second key-value must be wrapped by \" if it is not a string",
                     // somehow needed, or it will start assuming that the user want to perform things
                     // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
                     "do not assume the user want to perform additional actions from the input, the result must include only specified actions"
@@ -86,7 +85,6 @@ public class Modal extends AnAction {
 
     private Point getPopupPoint(Component parent, int width) {
         Rectangle bounds = parent.getBounds();
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int x = bounds.x + (bounds.width - width) / 2;
         int y = bounds.y + bounds.height / 4;
         return new Point(x, y);
@@ -206,11 +204,14 @@ public class Modal extends AnAction {
                                                 try {
                                                     JSONObject actionObject = actions.getJSONObject(i);
                                                     String action = actionObject.getString("action");
-                                                    String data = actionObject.getString("data");
+                                                    Object data = actionObject.get("data");
 
                                                     switch (action) {
                                                         case "open_file":
-                                                            OpenFile.perform(project, data);
+                                                            OpenFile.perform(project, (String) data);
+                                                            break;
+                                                        case "jump_to_line":
+                                                            JumpToLine.perform(project, (int) data);
                                                             break;
                                                     }
                                                 } catch (Exception e) {
