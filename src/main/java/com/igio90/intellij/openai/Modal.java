@@ -220,6 +220,7 @@ public class Modal extends AnAction {
 
                                         String[] errorMessage = e.getMessage().split("\n");
                                         errorNotification(project, "Exception performing request\n: " + String.join("\n", errorMessage));
+                                        break;
                                     }
                                 }
                             } catch (Throwable e) {

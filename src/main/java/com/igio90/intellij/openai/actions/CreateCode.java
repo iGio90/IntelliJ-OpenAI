@@ -74,24 +74,24 @@ public class CreateCode {
                                 return;
                             }
 
-                            List<Integer> changedLines = new ArrayList<>();
                             LinkedList<diff_match_patch.Diff> diffs = new diff_match_patch().diff_main(documentContent, newCode);
-                            int lineNum = 0;
+                            StringBuilder diffCode = new StringBuilder();
+                            ArrayList<Integer> changedLines = new ArrayList<>();
+                            int currentLine = 0;
                             for (diff_match_patch.Diff diff : diffs) {
-                                String[] lines = diff.text.split("\n");
-                                System.out.println("diff - op:" + diff.operation.name() + " " + diff.text);
-                                for (int i = 0; i < lines.length; i++) {
-                                    if (diff.operation != diff_match_patch.Operation.EQUAL) {
-                                        changedLines.add(lineNum);
-                                    }
-                                    if (i < lines.length - 1) {
-                                        lineNum++;
+                                if (diff.operation.equals(diff_match_patch.Operation.DELETE)) {
+                                    continue;
+                                }
+                                int diffLines = diff.text.split("\n").length;
+                                if (diff.operation.equals(diff_match_patch.Operation.EQUAL)) {
+                                    diffCode.append(diff.text);
+                                } else if (diff.operation.equals(diff_match_patch.Operation.INSERT)) {
+                                    diffCode.append(diff.text);
+                                    for (int i=0;i<diffLines;i++) {
+                                        changedLines.add(currentLine + i);
                                     }
                                 }
-                            }
-                            if (changedLines.size() > 1) {
-                                // unsure if this is correct, but I saw it always highlight an extra line
-                                changedLines.remove(changedLines.size() - 1);
+                                currentLine += diffLines;
                             }
 
                             DocumentUtils.replaceAllText(
