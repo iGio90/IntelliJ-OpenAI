@@ -10,6 +10,10 @@ import javax.swing.*;
 public class OpenAIPrefs extends AnAction {
     @Override
     public void actionPerformed(@NotNull AnActionEvent e) {
+        showDialog();
+    }
+
+    public static void showDialog() {
         SettingsDialog dialog = new SettingsDialog();
         dialog.setVisible(true);
         PropertiesComponent.getInstance().setValue("openai_api_key", dialog.getApiKey());

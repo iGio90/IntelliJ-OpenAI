@@ -23,9 +23,17 @@
          Read more: https://plugins.jetbrains.com/docs/intellij/plugin-extension-points.html -->
     <extensions defaultExtensionNs="com.intellij">
         <editorFactoryDocumentListener implementation="com.igio90.intellij.openai.Listener" />
+
+        <notificationGroup id="OpenAI.ErrorNotifications"
+                           displayType="BALLOON"
+                           toolWindowId="Event Log"/>
     </extensions>
 
     <actions>
+        <action id="OpenAIModal" class="com.igio90.intellij.openai.Modal" text="OpenAIModal">
+            <keyboard-shortcut keymap="$default" first-keystroke="alt SPACE"/>
+        </action>
+
         <action id="OpenAI"
                 class="com.igio90.intellij.openai.OpenAIPrefs"
                 text="OpenAI Preferences">
