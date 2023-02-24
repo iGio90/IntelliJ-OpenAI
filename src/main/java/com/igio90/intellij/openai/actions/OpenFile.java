@@ -21,17 +21,14 @@ import java.util.HashSet;
 import java.util.List;
 
 public class OpenFile implements IAction {
-
-    private final String action = "open_file";
-
     @Override
-    public String getName() {
-        return "OpenFile";
+    public String getAction() {
+        return "open_file";
     }
 
     @Override
-    public String getAction() {
-        return action;
+    public String getActionDescription() {
+        return "user want to open a file";
     }
 
     @Override
@@ -45,7 +42,7 @@ public class OpenFile implements IAction {
     }
 
     @Override
-    public void perform(Project project, Object... data) {
+    public boolean perform(Project project, Object... data) {
         var fileName = data[0].toString();
         PsiFile[] psiFiles = FilenameIndex
                 .getFilesByName(project, fileName, GlobalSearchScope.projectScope(project));
@@ -75,6 +72,7 @@ public class OpenFile implements IAction {
                         NotificationType.ERROR
                 );
                 Notifications.Bus.notify(notification);
+                return false;
             } else if (psiFilesSet.size() == 1) {
                 FileEditorManager.getInstance(project).openFile(
                         psiFilesSet.stream().iterator().next().getVirtualFile(), true
@@ -89,6 +87,7 @@ public class OpenFile implements IAction {
             // Multiple matching files found, show list and open selected file in editor
             showFileListPopup(project, psiFiles);
         }
+        return true;
     }
 
     private void showFileListPopup(Project project, PsiFile[] psiFiles) {

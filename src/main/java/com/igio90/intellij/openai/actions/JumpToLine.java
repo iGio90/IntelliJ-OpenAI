@@ -10,16 +10,15 @@ import java.util.Collection;
 import java.util.List;
 
 public class JumpToLine implements IAction {
-    private final String action = "jump_to_line";
-
-    @Override
-    public String getName() {
-        return "JumpToLine";
-    }
 
     @Override
     public String getAction() {
-        return action;
+        return "jump_to_line";
+    }
+
+    @Override
+    public String getActionDescription() {
+        return "user want to jump to a line";
     }
 
     @Override
@@ -33,20 +32,21 @@ public class JumpToLine implements IAction {
     }
 
     @Override
-    public void perform(Project project, Object... data) {
+    public boolean perform(Project project, Object... data) {
         var lineNum = Integer.parseInt(data[0].toString());
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         if (editor == null) {
-            return;
+            return false;
         }
 
         Document document = editor.getDocument();
         if (document.getLineCount() < lineNum) {
-            return;
+            return false;
         }
 
         int offset = document.getLineStartOffset(lineNum - 1);
         editor.getCaretModel().moveToOffset(offset);
         editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
+        return true;
     }
 }

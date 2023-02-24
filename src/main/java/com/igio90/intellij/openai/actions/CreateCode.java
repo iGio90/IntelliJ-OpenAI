@@ -1,5 +1,6 @@
 package com.igio90.intellij.openai.actions;
 
+import com.igio90.intellij.openai.Modal;
 import com.igio90.intellij.openai.utils.DocumentUtils;
 import com.igio90.intellij.openai.utils.OpenAiInputManager;
 import com.intellij.openapi.application.ApplicationManager;
@@ -11,11 +12,13 @@ import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.JBColor;
 import com.intellij.util.ThrowableRunnable;
 import com.intellij.util.ui.UIUtil;
+import lombok.extern.slf4j.Slf4j;
 import name.fraser.neil.plaintext.diff_match_patch;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -27,18 +30,19 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 public class CreateCode implements IAction {
-    private final String action = "create_code";
-
-    @Override
-    public String getName() {
-        return "CreateCode";
-    }
 
     @Override
     public String getAction() {
-        return action;
+        return "create_code";
+    }
+
+    @Override
+    public String getActionDescription() {
+        return "user want to add, modify or create code";
     }
 
     @Override
@@ -52,33 +56,39 @@ public class CreateCode implements IAction {
     }
 
     @Override
-    public void perform(Project project, Object... data) {
+    public boolean perform(Project project, Object... data) throws Throwable {
         var query = data[0].toString();
         Editor editor = FileEditorManager.getInstance(project).getSelectedTextEditor();
         if (editor == null) {
-            return;
+            return false;
         }
         Document document = editor.getDocument();
         String documentContent = document.getText();
 
-        new Task.Backgroundable(project, "generating code...") {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, "generating code...") {
             @Override
             public void run(@NotNull ProgressIndicator indicator) {
                 String newCode;
 
                 try {
-                    JSONObject object = OpenAiInputManager.getAiQueryCommand(documentContent, query);
-                    Request request = OpenAiInputManager.openAiGeneralRequest(object);
+                    JSONObject object = OpenAiInputManager.getAiCodeEditCommand(documentContent, query);
+                    Request request = OpenAiInputManager.openAiEditRequest(object);
                     try (Response response = OpenAiInputManager.response(request)) {
                         if (!response.isSuccessful() || response.body() == null) {
+                            com.igio90.intellij.openai.Modal.errorNotification(project, "OpenAI request failed with code: " + response.code());
+                            future.complete(false);
                             return;
                         }
+
                         object = new JSONObject(response.body().string());
                     }
                     JSONArray choices = object.getJSONArray("choices");
                     newCode = choices.getJSONObject(0).getString("text").replaceAll("^\\n+", "");
                 } catch (Throwable e) {
                     e.printStackTrace();
+                    future.completeExceptionally(e);
                     return;
                 }
 
@@ -108,10 +118,13 @@ public class CreateCode implements IAction {
                         "code gen"
                 );
 
+                // complete the future or the invokeLater will stuck everything
+                future.complete(true);
+
                 ArrayList<RangeHighlighter> highlighters = new ArrayList<>();
                 ApplicationManager.getApplication().invokeLater(() -> {
                     try {
-                        WriteCommandAction.writeCommandAction(DocumentUtils.getProject()).run((ThrowableRunnable<Throwable>) () -> {
+                        WriteCommandAction.writeCommandAction(project).run((ThrowableRunnable<Throwable>) () -> {
                             if (!changedLines.isEmpty()) {
                                 for (int i = 0; i < changedLines.size(); i++) {
                                     int line = changedLines.get(i);
@@ -149,10 +162,12 @@ public class CreateCode implements IAction {
                             }
                         });
                     } catch (Throwable e) {
-                        throw new RuntimeException(e);
+                        e.printStackTrace();
                     }
                 });
             }
-        }.queue();
+        });
+
+        return future.get();
     }
 }

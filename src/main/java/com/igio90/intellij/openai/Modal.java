@@ -106,8 +106,8 @@ public class Modal extends AnAction {
                                     .getActionSetString()
                                     .append(OpenAiInputManager.getUserInputString(input))
                                     .append(OpenAiInputManager.getCriteriaString()).toString();
-                            log.info("prompt:\n\n" + aiInput);
-                            Request request = OpenAiInputManager.openAiGeneralRequest(
+                            log.warn("prompt:\n\n" + aiInput);
+                            Request request = OpenAiInputManager.openAiCompletitionRequest(
                                     OpenAiInputManager.getAiTextCommand(aiInput));
                             try (Response response = OpenAiInputManager.response(request)) {
                                 if (!response.isSuccessful() || response.body() == null) {
@@ -170,7 +170,7 @@ public class Modal extends AnAction {
         return true;
     }
 
-    private void errorNotification(Project project, String content) {
+    public static void errorNotification(Project project, String content) {
         Notification notification = new Notification(
                 "OpenAI.ErrorNotifications",
                 "OpenAI error",

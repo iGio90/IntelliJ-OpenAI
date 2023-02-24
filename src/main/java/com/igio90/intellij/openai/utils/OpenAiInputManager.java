@@ -1,14 +1,10 @@
 package com.igio90.intellij.openai.utils;
 
-import com.igio90.intellij.openai.actions.CreateCode;
-import com.igio90.intellij.openai.actions.IAction;
-import com.igio90.intellij.openai.actions.JumpToLine;
-import com.igio90.intellij.openai.actions.OpenFile;
+import com.igio90.intellij.openai.actions.*;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.project.Project;
-import com.intellij.util.ThrowableRunnable;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.json.JSONArray;
@@ -21,25 +17,25 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class OpenAiInputManager {
 
-    private static final String newLine = "\n";
-    private static final String separator = " - ";
-    private static final String prerequisiteText = "given this set of actions and its value type:";
-    private static final String userInputText = "given the user input:";
-    private static final String criteriaText = "give me an output that match the following criteria";
+    private static final String NEW_LINE = "\n";
+    private static final String SEPARATOR = " - ";
+    private static final String PREREQUISITE_TEXT = "given this set of actions, description and data type expected in the result:";
+    private static final String USER_INPUT_TEXT = "given the user input:";
+    private static final String CRITERIA_TEXT = "give me an output that match the following criteria";
 
     private static final Collection<String> CRITERIA =
-            List.of("output must be a json array",
-                    "array must contains zero or more json objects with a two key value inside",
+            List.of("determine which actions the user want to perform from the \"user input\"",
+                    "output must be a json array",
+                    "do not prepend the json array with any other word, I must be able to parse the output as json",
+                    "array should contains zero or more json objects with a two key value inside",
                     "objects must be ordered according to the user input",
                     "first key-value must have a key \"action\"",
                     "first key-value must have a value that match one of the actions I gave you in the list before",
                     "second key-value must have a key \"data\"",
-                    "second key-value value must be retrieved from the user input",
-                    "second key-value value must have a data type matching what I gave you in the list before",
-                    // somehow needed, or it will start assuming that the user want to perform things
-                    // in example, I told it to navigate to file xy.java, and it assumed I also wanted to jump to some line
-                    "do not assume the user want to perform additional actions from the input, " +
-                            "the result must include only specified actions");
+                    "\"data\" value must be retrieved from the user input",
+                    "\"data\" value must respect the data type given in the set of actions",
+                    "\"data\" must not be empty and must be retrieved from the user input. Do not assume user want to perform more actions if not explicitly requested"
+            );
     public static final Set<IAction> actions = registerActions();
 
     static Set<IAction> registerActions() {
@@ -47,6 +43,7 @@ public class OpenAiInputManager {
         a.add(new OpenFile());
         a.add(new JumpToLine());
         a.add(new CreateCode());
+        a.add(new Undo());
         return a;
     }
 
@@ -59,35 +56,38 @@ public class OpenAiInputManager {
     }
 
     public static StringBuilder getCriteriaString() {
-        StringBuilder sb = new StringBuilder(criteriaText);
-        sb.append(newLine);
+        StringBuilder sb = new StringBuilder(NEW_LINE);
+        sb.append(CRITERIA_TEXT);
+        sb.append(NEW_LINE);
         for (String criteria : CRITERIA) {
-            sb.append(separator)
+            sb.append(SEPARATOR)
                     .append(criteria)
-                    .append(newLine);
+                    .append(NEW_LINE);
         }
-        sb.append(newLine);
+        sb.append(NEW_LINE);
         return sb;
     }
 
     public static StringBuilder getUserInputString(String input) {
-        StringBuilder sb = new StringBuilder(userInputText);
-        sb.append(newLine);
+        StringBuilder sb = new StringBuilder(USER_INPUT_TEXT);
+        sb.append(NEW_LINE);
         sb.append(input);
-        sb.append(newLine);
+        sb.append(NEW_LINE);
         return sb;
     }
 
     public static StringBuilder getActionSetString() {
-        StringBuilder sb = new StringBuilder(prerequisiteText);
-        sb.append(newLine);
+        StringBuilder sb = new StringBuilder(PREREQUISITE_TEXT);
+        sb.append(NEW_LINE);
         for (var entry : actions) {
             sb.append(entry.getAction())
-                    .append(separator)
+                    .append(SEPARATOR)
+                    .append(entry.getActionDescription())
+                    .append(SEPARATOR)
                     .append(entry.getType())
-                    .append(newLine);
+                    .append(NEW_LINE);
         }
-        sb.append(newLine);
+        sb.append(NEW_LINE);
         return sb;
     }
 
@@ -102,7 +102,7 @@ public class OpenAiInputManager {
         return j;
     }
 
-    public static JSONObject getAiQueryCommand(String documentContent, String query) {
+    public static JSONObject getAiCodeEditCommand(String documentContent, String query) {
         JSONObject j = new JSONObject();
         j.put("input", documentContent);
         j.put("instruction", query);
@@ -112,7 +112,7 @@ public class OpenAiInputManager {
         return j;
     }
 
-    public static Request openAiGeneralRequest(JSONObject jsonQuery) {
+    public static Request openAiCompletitionRequest(JSONObject jsonQuery) {
         return new Request.Builder()
                 .url("https://api.openai.com/v1/completions")
                 .addHeader("Content-Type", "application/json")
@@ -122,9 +122,19 @@ public class OpenAiInputManager {
                 .build();
     }
 
+    public static Request openAiEditRequest(JSONObject jsonQuery) {
+        return new Request.Builder()
+                .url("https://api.openai.com/v1/edits")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("Authorization", "Bearer " + getOpenAIApiKey())
+                .post(RequestBody.create(jsonQuery.toString(),
+                        MediaType.parse("application/json")))
+                .build();
+    }
+
     private static void parseAction(Project project, JSONArray actions) {
         try {
-            WriteCommandAction.writeCommandAction(project).run((ThrowableRunnable<Throwable>) () -> {
+            WriteCommandAction.writeCommandAction(project).run(() -> {
                 for (int i = 0; i < actions.length(); i++) {
                     try {
                         JSONObject actionObject = actions.getJSONObject(i);
@@ -150,7 +160,7 @@ public class OpenAiInputManager {
         var aiResponse = new JSONObject(body);
         JSONArray choices = aiResponse.getJSONArray("choices");
         String content = choices.getJSONObject(0).getString("text");
-        log.debug("open ai actions result:\n\n" + content);
+        log.warn("open ai actions result:\n\n" + content);
         JSONArray actions = new JSONArray(content);
         ApplicationManager.getApplication().invokeLater(() -> parseAction(project, actions));
     }
